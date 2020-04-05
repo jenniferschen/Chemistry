@@ -15,7 +15,7 @@ brew install clojure
 Run IntelliJ and add [clj-fuzzy "0.4.1"] to dependencies in project.clj
 
 ```bash
-clojure chemistry.clj
+(-main)
 ```
 
 ### anotha one
