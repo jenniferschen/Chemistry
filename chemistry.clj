@@ -540,9 +540,9 @@
   (binding [*ns* (the-ns 'propel.core)]
     (propel-gp (update-in (merge {:instructions default-instructions
                                   :error-function string-classification-error-function
-                                  :max-generations 1000
-                                  :population-size 300
-                                  :max-initial-plushy-size 500
+                                  :max-generations 10000
+                                  :population-size 500
+                                  :max-initial-plushy-size 800
                                   :step-limit 100
                                   :parent-selection :lexicase
                                   ;;:tournament
