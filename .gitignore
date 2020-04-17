@@ -12,3 +12,5 @@ pom.xml.asc
 .lein-failures
 .nrepl-port
 .cpcache/
+ocrtrain_1.csv
+ocrtrain_2.csv
