@@ -3,6 +3,7 @@
   (:gen-class)
   (:use clj-fuzzy.metrics))
 
+
 ;;added [clj-fuzzy "0.4.1"] to dependencies in project.clj
 
 (def example-push-state
@@ -35,7 +36,8 @@
    'string_concat
    'string_length
    'string_includes?
-   'string_replace
+   'string_replacefirst
+   ; 'string_shuffle
    'close
    0
    1
@@ -239,12 +241,24 @@
 ;                          [:input :string :string]
 ;                          :string))
 
-(defn string_replace
+(defn string_replacefirst
   [state]
   (make-push-instruction state
-                         #(apply str (clojure.string/replace %1 %2 %3))
+                         #(apply str (clojure.string/replace-first %1 %2 %3))
                          [:string :string :string]
                          :string))
+
+;;the following don't work yet
+; (defn string_shuffle
+;   [state]
+;   (make-push-instruction state 
+;                          #(apply str (shuffle (seq %)))
+;                           [:string]
+;                           :string))
+; (defn string_swap
+;   [state]
+;   (make-push-instruction state
+;                           #(apply )))
 ;;;;;;;;;
 ;; Interpreter
 
@@ -358,6 +372,7 @@
                  shorter-padded
                  longer))))
 
+
 (defn uniform-addition
   "Randomly adds new instructions before every instruction (and at the end of
   the plushy) with some probability."
@@ -371,11 +386,27 @@
             (interleave (conj plushy :mutation-padding)
                         rand-code))))
 
+
+
 (defn uniform-deletion
   "Randomly deletes instructions from plushy at some rate."
   [plushy]
   (remove (fn [x] (< (rand) 0.05))
           plushy))
+
+; (defn new-individual
+;   "Returns a new individual produced by selection and variation of
+;   individuals in the population."
+;   [pop argmap]
+;   {:plushy
+;    (let [prob (rand)]
+;      (cond
+;        (< prob 0.7) (uniform-addition (:plushy (select-parent pop argmap))
+;                                        (:instructions argmap))
+;        (< prob 0.5) (crossover (:plushy (select-parent pop argmap))
+;                                (:plushy (select-parent pop argmap)))       
+;        :else (uniform-deletion (:plushy (select-parent pop argmap)))
+;        ))})
 
 (defn new-individual
   "Returns a new individual produced by selection and variation of
@@ -383,12 +414,11 @@
   [pop argmap]
   {:plushy
    (let [prob (rand)]
-     (cond
-       (< prob 0.5) (crossover (:plushy (select-parent pop argmap))
-                               (:plushy (select-parent pop argmap)))
-       (< prob 0.7) (uniform-addition (:plushy (select-parent pop argmap))
-                                       (:instructions argmap))
-       :else (uniform-deletion (:plushy (select-parent pop argmap)))))})
+      (when (< prob 0.5) (crossover (:plushy (select-parent pop argmap))
+                               (:plushy (select-parent pop argmap))))
+      (when (< prob 0.7) (uniform-addition (:plushy (select-parent pop argmap))
+                                       (:instructions argmap)))
+      (when (< prob 0.7) (uniform-deletion (:plushy (select-parent pop argmap)))))})
 
 (defn report
   "Reports information each generation."
@@ -497,21 +527,28 @@
   "Using jaro-winkler instead of levenshtein."
   (jaro-winkler sequence1 sequence2))
 
+(defn length-matching
+  [sequence1 sequence2]
+  "comparing lengths of output and correct output."
+  (if (zero? (- (count sequence1) (count sequence2)))
+    0
+    (/ (Math/abs (- (count sequence1) (count sequence2))))))
+
 (defn string-classification-error-function
   "Finds the behaviors and errors of an individual: Error is 0 if the value and the program's selected behavior match, or 1 if they differ, or 1000000 if no behavior is produced. The behavior is here defined as the final top item on the :boolean stack."
   [argmap individual]
   (let [program (push-from-plushy (:plushy individual))
-        inputs ["[I-].[Na+].C=CCBr"
-        "[CH2:15]([CH:16]([CH3:17])[CH3:18])[Mg+:19].[CH2:20]1[O:21][CH2:22][CH2:23][CH2:24]1.[Cl-:14].[OH:1][c:2]1[n:3][cH:4][c:5]([C:6](=[O:7])[N:8]([O:9][CH3:10])[CH3:11])[cH:12][cH:13]1"
-        "[CH3:14][NH2:15].[N+:1](=[O:2])([O-:3])[c:4]1[cH:5][c:6]([C:7](=[O:8])[OH:9])[cH:10][cH:11][c:12]1[Cl:13].[OH2:16]"
-        "[CH2:1]([CH3:2])[n:3]1[cH:4][c:5]([C:22](=[O:23])[OH:24])[c:6](=[O:21])[c:7]2[cH:8][c:9]([F:20])[c:10](-[c:13]3[cH:14][cH:15][c:16]([NH2:19])[cH:17][cH:18]3)[cH:11][c:12]12.[CH:25](=[O:26])[OH:27]"
-        ;;"(C(=O)O).(OCC)"
+        inputs [
+        "C c 1 c c 2 c ( [N+] ( = O ) [O-] ) c c c c 2 c [n+] 1 [O-] . O = P ( Cl ) ( Cl ) Cl"
+        "O C 1 c 2 c c c c c 2 O c 2 n c c c c 2 1"
+        "O = c 1 c 2 c c ( C = N O ) c c c 2 o c 2 n c c c c 1 2"
+        "O = C ( [O-] ) c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1 . O = S ( Cl ) Cl"
         ]
-        correct-outputs ["[Na+].[Br-].C=CCI"
-        "[OH:1][c:2]1[n:3][cH:4][c:5]([C:6](=[O:7])[CH2:15][CH:16]([CH3:17])[CH3:18])[cH:12][cH:13]1 15-19;6-15;6-8"
-        "[N+:1](=[O:2])([O-:3])[c:4]1[cH:5][c:6]([C:7](=[O:8])[OH:9])[cH:10][cH:11][c:12]1[NH:15][CH3:14] 12-13;12-15"
-        "[CH2:1]([CH3:2])[n:3]1[cH:4][c:5]([C:22](=[O:23])[OH:24])[c:6](=[O:21])[c:7]2[cH:8][c:9]([F:20])[c:10](-[c:13]3[cH:14][cH:15][c:16]([NH:19][CH:25]=[O:26])[cH:17][cH:18]3)[cH:11][c:12]12 19-25;25-27"
-        ;;"(C(=O)OCC).(O)"
+        correct-outputs [
+        "C c 1 c c 2 c ( [N+] ( = O ) [O-] ) c c c c 2 c ( Cl ) n 1"
+        "c 1 c c c 2 c ( c 1 ) C c 1 c c c n c 1 O 2"
+        "N # C c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1"
+        "O = C ( Cl ) c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1"
         ]
         outputs (map (fn [input]
                        (peek-stack
@@ -524,9 +561,11 @@
         errors (map (fn [correct-output output]
                       (if (= output :no-stack-item)
                         1000000
-                        (+ (float (- 1 (sequence-similarity output correct-output)))
-                        (float (- 1 (sequence-similarity-jw output correct-output)))) ;;1-jw, so the higher this float value the worse the similarity
-                        )) ;;adding levenshtein distance to 1 minus jaro-winkler similarity
+                        ; (+ (* 0.5 (float (- 1 (sequence-similarity output correct-output))))
+                        ; (float (- 1 (sequence-similarity-jw output correct-output)))) ;;1-jw, so the higher this float value the worse the similarity
+                        ; ))
+                        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        (+ (float (- 1 (sequence-similarity output correct-output))) (* 0.25 (float (length-matching output correct-output )))) ))
                     correct-outputs
                     outputs)]
     (assoc individual
@@ -540,9 +579,9 @@
   (binding [*ns* (the-ns 'propel.core)]
     (propel-gp (update-in (merge {:instructions default-instructions
                                   :error-function string-classification-error-function
-                                  :max-generations 10000
-                                  :population-size 500
-                                  :max-initial-plushy-size 800
+                                  :max-generations 500
+                                  :population-size 600
+                                  :max-initial-plushy-size 600
                                   :step-limit 100
                                   :parent-selection :lexicase
                                   ;;:tournament
