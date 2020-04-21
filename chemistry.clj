@@ -18,36 +18,35 @@
 (def default-instructions
   (list
    'in1
-   'integer_+
-   'integer_-
-   'integer_*
-   'integer_%
-   'integer_=
-   'exec_dup
-   'exec_if
-   'boolean_and
-   'boolean_or
-   'boolean_not
-   'boolean_=
-   'string_=
-   'string_take
-   'string_drop
-   'string_reverse
-   'string_concat
-   'string_length
-   'string_includes?
+   ; 'integer_+
+   ; 'integer_-
+   ; 'integer_*
+   ; 'integer_%
+   ; 'integer_=
+   ; 'exec_dup
+   ; 'exec_if
+   ; 'boolean_and
+   ; 'boolean_or
+   ; 'boolean_not
+   ; 'boolean_=
+   ; 'string_=
+   ; 'string_take
+   ; 'string_drop
+   ; 'string_reverse
+   ; 'string_concat
+   ; 'string_length
+   ; 'string_includes?
    'string_replacefirst
-   ; 'string_shuffle
-   'close
-   0
-   1
-   true
-   false
-   ""
-   "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-   "abcdefghijklmnopqrstuvwxyz"
-   "[]():.=-#"
-   "0123456789"
+   'string_swap
+   ; 'close
+   ; 0
+   ; 1
+   ; true
+   ; false
+   ; "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+   ; "abcdefghijklmnopqrstuvwxyz"
+   ; "[]():.=-#"
+   ; "0123456789"
    ))
 
 (def opens ; number of blocks opened by instructions (default = 0)
@@ -248,6 +247,7 @@
                          [:string :string :string]
                          :string))
 
+
 ;;the following don't work yet
 ; (defn string_shuffle
 ;   [state]
@@ -255,11 +255,35 @@
 ;                          #(apply str (shuffle (seq %)))
 ;                           [:string]
 ;                           :string))
-; (defn string_swap
+
+(defn string_swap_helper [s]
+  (let [sub1
+        (apply str(take (rand-int (count s)) s))]
+    (let [sub2 (apply str(drop (count sub1) s))]
+      (apply str (concat " " sub2 sub1)))
+  ))
+
+(defn string_swap
+  [state]
+  (make-push-instruction state
+                          #(apply str (string_swap_helper %))
+                          [:string]
+                          :string))
+
+; (defn substring_swap_helper [s]
+;   (let [sub1
+;         (apply str(take (rand-int (count s)) s))]
+;     (let [sub2 (apply str(drop (count sub1) s))]
+;       (apply str (concat sub2 sub1)))
+
+
+
+; (defn substring_swap
 ;   [state]
 ;   (make-push-instruction state
-;                           #(apply )))
-;;;;;;;;;
+;                           #(apply str (string_swap_helper %))
+;                           [:string]
+;                           :string))
 ;; Interpreter
 
 (defn interpret-one-step
@@ -521,7 +545,6 @@
           max-dist (max (count sequence1) (count sequence2))]
       (/ (- max-dist dist) max-dist))))
 
-
 (defn sequence-similarity-jw
   [sequence1 sequence2]
   "Using jaro-winkler instead of levenshtein."
@@ -539,16 +562,18 @@
   [argmap individual]
   (let [program (push-from-plushy (:plushy individual))
         inputs [
-        "C c 1 c c 2 c ( [N+] ( = O ) [O-] ) c c c c 2 c [n+] 1 [O-] . O = P ( Cl ) ( Cl ) Cl"
+        ; "(C(=O)O).(OCC)"
+        ; "C c 1 c c 2 c ( [N+] ( = O ) [O-] ) c c c c 2 c [n+] 1 [O-] . O = P ( Cl ) ( Cl ) Cl"
         "O C 1 c 2 c c c c c 2 O c 2 n c c c c 2 1"
-        "O = c 1 c 2 c c ( C = N O ) c c c 2 o c 2 n c c c c 1 2"
-        "O = C ( [O-] ) c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1 . O = S ( Cl ) Cl"
+        ; "O = c 1 c 2 c c ( C = N O ) c c c 2 o c 2 n c c c c 1 2"
+        ; "O = C ( [O-] ) c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1 . O = S ( Cl ) Cl"
         ]
         correct-outputs [
-        "C c 1 c c 2 c ( [N+] ( = O ) [O-] ) c c c c 2 c ( Cl ) n 1"
+        ; "(C(=O)OCC).(O)"
+        ; "C c 1 c c 2 c ( [N+] ( = O ) [O-] ) c c c c 2 c ( Cl ) n 1"
         "c 1 c c c 2 c ( c 1 ) C c 1 c c c n c 1 O 2"
-        "N # C c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1"
-        "O = C ( Cl ) c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1"
+        ; "N # C c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1"
+        ; "O = C ( Cl ) c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1"
         ]
         outputs (map (fn [input]
                        (peek-stack
