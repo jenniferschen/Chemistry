@@ -30,23 +30,25 @@
    ; 'boolean_not
    ; 'boolean_=
    ; 'string_=
-   ; 'string_take
-   ; 'string_drop
-   ; 'string_reverse
-   ; 'string_concat
+   'string_take
+   'string_drop
+   'string_reverse
+   'string_concat
    ; 'string_length
    ; 'string_includes?
    'string_replacefirst
    'string_swap
+   'substring_swap
    ; 'close
-   ; 0
-   ; 1
+   0
+   1
+   2
    ; true
    ; false
-   ; "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-   ; "abcdefghijklmnopqrstuvwxyz"
-   ; "[]():.=-#"
-   ; "0123456789"
+   "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+   "abcdefghijklmnopqrstuvwxyz"
+   "[]():.=-#"
+   "0123456789"
    ))
 
 (def opens ; number of blocks opened by instructions (default = 0)
@@ -233,12 +235,6 @@
   [state]
   (make-push-instruction state clojure.string/includes? [:string :string] :boolean))
 
-; (defn string_replace
-;   [state]
-;   (make-push-instruction state
-;                          #(apply str (replace %1 %2 %3))
-;                          [:input :string :string]
-;                          :string))
 
 (defn string_replacefirst
   [state]
@@ -247,14 +243,6 @@
                          [:string :string :string]
                          :string))
 
-
-;;the following don't work yet
-; (defn string_shuffle
-;   [state]
-;   (make-push-instruction state 
-;                          #(apply str (shuffle (seq %)))
-;                           [:string]
-;                           :string))
 
 (defn string_swap_helper [s]
   (let [sub1
@@ -271,19 +259,28 @@
                           :string))
 
 ; (defn substring_swap_helper [s]
-;   (let [sub1
-;         (apply str(take (rand-int (count s)) s))]
-;     (let [sub2 (apply str(drop (count sub1) s))]
-;       (apply str (concat sub2 sub1)))
+;   (let [sub0 (subs s (rand-int (/(count s) 2)) (+ (/(count s) 2) (rand-int (/(count s) 2))))]
+;     (let [sub1
+;           (apply str(take (rand-int (count sub0)) sub0))]
+;       (let [sub2 (apply str(drop (count sub1) sub0))]
+;         (apply str (concat sub2 sub1)))
+;       )))
+
+(defn substring_swap_helper [s ind1 ind2]
+  (let [sub0 (subs s ind1 ind2)]
+    (let [sub1
+          (apply str(take (rand-int (count sub0)) sub0))]
+      (let [sub2 (apply str(drop (count sub1) sub0))]
+        (apply str (concat (take ind1 s) sub2 sub1 (drop ind2 s))))
+      )))
 
 
-
-; (defn substring_swap
-;   [state]
-;   (make-push-instruction state
-;                           #(apply str (string_swap_helper %))
-;                           [:string]
-;                           :string))
+(defn substring_swap
+  [state]
+  (make-push-instruction state
+                          #(apply str (substring_swap_helper %1 %2 %3))
+                          [:string :integer :integer]
+                          :string))
 ;; Interpreter
 
 (defn interpret-one-step
@@ -567,6 +564,7 @@
         "O C 1 c 2 c c c c c 2 O c 2 n c c c c 2 1"
         ; "O = c 1 c 2 c c ( C = N O ) c c c 2 o c 2 n c c c c 1 2"
         ; "O = C ( [O-] ) c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1 . O = S ( Cl ) Cl"
+        "N c 1 c c c c ( C ( F ) ( F ) F ) c 1 "
         ]
         correct-outputs [
         ; "(C(=O)OCC).(O)"
@@ -574,6 +572,7 @@
         "c 1 c c c 2 c ( c 1 ) C c 1 c c c n c 1 O 2"
         ; "N # C c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1"
         ; "O = C ( Cl ) c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1"
+        "N C 1 C C C C ( C ( F ) ( F ) F ) C 1"
         ]
         outputs (map (fn [input]
                        (peek-stack
