@@ -18,9 +18,9 @@
 (def default-instructions
   (list
    'in1
-   ; 'integer_+
+   'integer_+
    ; 'integer_-
-   ; 'integer_*
+   'integer_*
    ; 'integer_%
    ; 'integer_=
    ; 'exec_dup
@@ -32,23 +32,29 @@
    ; 'string_=
    'string_take
    'string_drop
-   'string_reverse
+   ; 'string_reverse
    'string_concat
    ; 'string_length
    ; 'string_includes?
-   'string_replacefirst
+   ; 'string_replace
+   ; 'string_replacefirst
    'string_swap
    'substring_swap
+   ; 'char_get
+   'char_swap
    ; 'close
    0
    1
    2
+   3
+   4
+   5
    ; true
    ; false
-   "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-   "abcdefghijklmnopqrstuvwxyz"
+   ; "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+   ; "abcdefghijklmnopqrstuvwxyz"
    "[]():.=-#"
-   "0123456789"
+   ; "0123456789"
    ))
 
 (def opens ; number of blocks opened by instructions (default = 0)
@@ -235,6 +241,12 @@
   [state]
   (make-push-instruction state clojure.string/includes? [:string :string] :boolean))
 
+(defn string_replace
+  [state]
+  (make-push-instruction state
+                         #(apply str (clojure.string/replace-first %1 %2 %3))
+                         [:string :string :string]
+                         :string))
 
 (defn string_replacefirst
   [state]
@@ -244,35 +256,33 @@
                          :string))
 
 
-(defn string_swap_helper [s]
+(defn string_swap_helper [s ind_swap]
   (let [sub1
-        (apply str(take (rand-int (count s)) s))]
-    (let [sub2 (apply str(drop (count sub1) s))]
+        (apply str(take (mod ind_swap (+ 1 (count s))) s))]
+    (let [sub2 (apply str(drop (mod ind_swap (+ 1 (count s))) s))]
       (apply str (concat " " sub2 sub1)))
   ))
 
 (defn string_swap
   [state]
   (make-push-instruction state
-                          #(apply str (string_swap_helper %))
-                          [:string]
+                          #(apply str (string_swap_helper %1 %2))
+                          [:string :integer]
                           :string))
 
-; (defn substring_swap_helper [s]
-;   (let [sub0 (subs s (rand-int (/(count s) 2)) (+ (/(count s) 2) (rand-int (/(count s) 2))))]
-;     (let [sub1
-;           (apply str(take (rand-int (count sub0)) sub0))]
-;       (let [sub2 (apply str(drop (count sub1) sub0))]
-;         (apply str (concat sub2 sub1)))
-;       )))
 
 (defn substring_swap_helper [s ind1 ind2]
-  (let [sub0 (subs s ind1 ind2)]
-    (let [sub1
-          (apply str(take (rand-int (count sub0)) sub0))]
-      (let [sub2 (apply str(drop (count sub1) sub0))]
-        (apply str (concat (take ind1 s) sub2 sub1 (drop ind2 s))))
-      )))
+  (if (not= (count s) 0)
+    (let [i1 (mod ind1 (count s))
+          i2 (mod ind2 (count s))
+          sub0 (subs s (min i1 i2) (max i1 i2))
+          sub1 (apply str (take (/ (count sub0) 2) sub0))
+          sub2 (apply str (drop (count sub1) sub0))]
+      (apply str (concat (take (min i1 i2) s)
+                         sub2
+                         sub1
+                         (drop (max i1 i2) s))))
+    ""))
 
 
 (defn substring_swap
@@ -281,6 +291,41 @@
                           #(apply str (substring_swap_helper %1 %2 %3))
                           [:string :integer :integer]
                           :string))
+
+(defn char_swap_helper [s ind1 ind2]
+    (if (not= (count s) 0)
+      (let [ind1_n (min (mod ind1 (count s)) (mod ind2 (count s)))]
+        (let [ind2_n (max (mod ind1 (count s)) (mod ind2 (count s)))]
+          (if (not= ind1_n ind2_n)
+          (let [sub1 (take (- ind1_n 1) s)]
+            (let [char1 (take 1 (drop (- ind1_n 1) s))]
+              (let [sub2 (take (- (- ind2_n ind1_n) 1) (drop (count (concat sub1 char1)) s))]
+                (let [char2 (take 1 (drop (count (concat sub1 char1 sub2)) s))]
+                  (let [sub3 (drop (count (concat sub1 char1 sub2 char2)) s)]
+                    (apply str (concat sub1 char2 sub2 char1 sub3))
+                    )))))))
+        )))
+
+
+(defn char_swap
+  [state]
+  (make-push-instruction state
+                          #(apply str (char_swap_helper %1 %2 %3))
+                          [:string :integer :integer]
+                          :string))
+
+(defn char_get_helper [s ind]
+  (take 1 (drop (mod ind (+ 1 (count s))) s))
+  )
+
+(defn char_get
+  [state]
+  (make-push-instruction state
+                          #(apply str (char_get_helper %1 %2))
+                          [:string :integer]
+                          :string))
+  
+  
 ;; Interpreter
 
 (defn interpret-one-step
@@ -415,31 +460,31 @@
   (remove (fn [x] (< (rand) 0.05))
           plushy))
 
-; (defn new-individual
-;   "Returns a new individual produced by selection and variation of
-;   individuals in the population."
-;   [pop argmap]
-;   {:plushy
-;    (let [prob (rand)]
-;      (cond
-;        (< prob 0.7) (uniform-addition (:plushy (select-parent pop argmap))
-;                                        (:instructions argmap))
-;        (< prob 0.5) (crossover (:plushy (select-parent pop argmap))
-;                                (:plushy (select-parent pop argmap)))       
-;        :else (uniform-deletion (:plushy (select-parent pop argmap)))
-;        ))})
-
 (defn new-individual
   "Returns a new individual produced by selection and variation of
   individuals in the population."
   [pop argmap]
   {:plushy
    (let [prob (rand)]
-      (when (< prob 0.5) (crossover (:plushy (select-parent pop argmap))
-                               (:plushy (select-parent pop argmap))))
-      (when (< prob 0.7) (uniform-addition (:plushy (select-parent pop argmap))
-                                       (:instructions argmap)))
-      (when (< prob 0.7) (uniform-deletion (:plushy (select-parent pop argmap)))))})
+     (cond
+       (< prob 0.7) (uniform-addition (:plushy (select-parent pop argmap))
+                                       (:instructions argmap))
+       (< prob 0.5) (crossover (:plushy (select-parent pop argmap))
+                               (:plushy (select-parent pop argmap)))       
+       :else (uniform-deletion (:plushy (select-parent pop argmap)))
+       ))})
+
+; (defn new-individual
+;   "Returns a new individual produced by selection and variation of
+;   individuals in the population."
+;   [pop argmap]
+;   {:plushy
+;    (let [prob (rand)]
+;       (when (< prob 0.5) (crossover (:plushy (select-parent pop argmap))
+;                                (:plushy (select-parent pop argmap))))
+;       (when (< prob 0.7) (uniform-addition (:plushy (select-parent pop argmap))
+;                                        (:instructions argmap)))
+;       (when (< prob 0.7) (uniform-deletion (:plushy (select-parent pop argmap)))))})
 
 (defn report
   "Reports information each generation."
@@ -554,6 +599,8 @@
     0
     (/ (Math/abs (- (count sequence1) (count sequence2))))))
 
+
+
 (defn string-classification-error-function
   "Finds the behaviors and errors of an individual: Error is 0 if the value and the program's selected behavior match, or 1 if they differ, or 1000000 if no behavior is produced. The behavior is here defined as the final top item on the :boolean stack."
   [argmap individual]
@@ -561,18 +608,24 @@
         inputs [
         ; "(C(=O)O).(OCC)"
         ; "C c 1 c c 2 c ( [N+] ( = O ) [O-] ) c c c c 2 c [n+] 1 [O-] . O = P ( Cl ) ( Cl ) Cl"
-        "O C 1 c 2 c c c c c 2 O c 2 n c c c c 2 1"
+        ; "O C 1 c 2 c c c c c 2 O c 2 n c c c c 2 1"
         ; "O = c 1 c 2 c c ( C = N O ) c c c 2 o c 2 n c c c c 1 2"
         ; "O = C ( [O-] ) c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1 . O = S ( Cl ) Cl"
-        "N c 1 c c c c ( C ( F ) ( F ) F ) c 1 "
+        ; "N c 1 c c c c ( C ( F ) ( F ) F ) c 1 "
+        ; "C O c 1 c c ( N ) c c c 1 Cl "
+        ; "C N N . O = c 1 c ( Cl ) c ( Cl ) c n n 1 - c 1 c c c c c 1 "
+        "Cl . N c 1 c ( Cl ) c c ( C ( F ) ( F ) F ) c c 1 Cl "
         ]
         correct-outputs [
         ; "(C(=O)OCC).(O)"
         ; "C c 1 c c 2 c ( [N+] ( = O ) [O-] ) c c c c 2 c ( Cl ) n 1"
-        "c 1 c c c 2 c ( c 1 ) C c 1 c c c n c 1 O 2"
+        ; "c 1 c c c 2 c ( c 1 ) C c 1 c c c n c 1 O 2"
         ; "N # C c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1"
         ; "O = C ( Cl ) c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1"
-        "N C 1 C C C C ( C ( F ) ( F ) F ) C 1"
+        ; "N C 1 C C C C ( C ( F ) ( F ) F ) C 1"
+        ; "N c 1 c c c ( Cl ) c ( O ) c 1"
+        ; "C N ( N ) c 1 c n n ( - c 2 c c c c c 2 ) c ( = O ) c 1 Cl"
+        "F C ( F ) ( F ) c 1 c c ( Cl ) c ( Cl ) c ( Cl ) c 1"
         ]
         outputs (map (fn [input]
                        (peek-stack
@@ -588,7 +641,6 @@
                         ; (+ (* 0.5 (float (- 1 (sequence-similarity output correct-output))))
                         ; (float (- 1 (sequence-similarity-jw output correct-output)))) ;;1-jw, so the higher this float value the worse the similarity
                         ; ))
-                        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                         (+ (float (- 1 (sequence-similarity output correct-output))) (* 0.25 (float (length-matching output correct-output )))) ))
                     correct-outputs
                     outputs)]
@@ -604,12 +656,12 @@
     (propel-gp (update-in (merge {:instructions default-instructions
                                   :error-function string-classification-error-function
                                   :max-generations 500
-                                  :population-size 600
-                                  :max-initial-plushy-size 600
+                                  :population-size 700
+                                  :max-initial-plushy-size 500
                                   :step-limit 100
                                   :parent-selection :lexicase
-                                  ;;:tournament
-                                  ;;:tournament-size 5
+                                  ; :parent-selection :tournament
+                                  ; :tournament-size 8
                                 }
                                  (apply hash-map
                                         (map read-string args)))
