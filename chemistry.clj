@@ -32,28 +32,32 @@
    ; 'string_=
    'string_take
    'string_drop
-   ; 'string_reverse
+   'string_reverse
    'string_concat
    ; 'string_length
    ; 'string_includes?
-   ; 'string_replace
-   ; 'string_replacefirst
+   'string_replace
+   'string_replacefirst
    'string_swap
    'substring_swap
-   ; 'char_get
+   'char_get
    'char_swap
+   'substring_del
    ; 'close
-   0
    1
    2
    3
    4
    5
+   6
+   7
+   8
+   9
    ; true
    ; false
    ; "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
    ; "abcdefghijklmnopqrstuvwxyz"
-   "[]():.=-#"
+   "[]():.=-# "
    ; "0123456789"
    ))
 
@@ -293,18 +297,19 @@
                           :string))
 
 (defn char_swap_helper [s ind1 ind2]
-    (if (not= (count s) 0)
-      (let [ind1_n (min (mod ind1 (count s)) (mod ind2 (count s)))]
-        (let [ind2_n (max (mod ind1 (count s)) (mod ind2 (count s)))]
-          (if (not= ind1_n ind2_n)
-          (let [sub1 (take (- ind1_n 1) s)]
-            (let [char1 (take 1 (drop (- ind1_n 1) s))]
-              (let [sub2 (take (- (- ind2_n ind1_n) 1) (drop (count (concat sub1 char1)) s))]
-                (let [char2 (take 1 (drop (count (concat sub1 char1 sub2)) s))]
-                  (let [sub3 (drop (count (concat sub1 char1 sub2 char2)) s)]
-                    (apply str (concat sub1 char2 sub2 char1 sub3))
-                    )))))))
-        )))
+    (if (and (not= (count s) 0) (not= (mod ind1 (count s)) (mod ind2 (count s))))
+      (let [ind1_n (min (mod ind1 (count s)) (mod ind2 (count s)))
+            ind2_n (max (mod ind1 (count s)) (mod ind2 (count s)))
+            sub1 (take (- ind1_n 1) s)
+            char1 (take 1 (drop (- ind1_n 1) s))
+            sub2 (take (- (- ind2_n ind1_n) 1) (drop (count (concat sub1 char1)) s))
+            char2 (take 1 (drop (count (concat sub1 char1 sub2)) s))
+            sub3 (drop (count (concat sub1 char1 sub2 char2)) s)]
+                (apply str (concat sub1 char2 sub2 char1 sub3))
+                )
+      "")) 
+
+
 
 
 (defn char_swap
@@ -324,7 +329,21 @@
                           #(apply str (char_get_helper %1 %2))
                           [:string :integer]
                           :string))
-  
+
+(defn substring_del_helper [s ind1 ind2]
+  (if (not= (count s) 0)
+    (let [i1 (mod ind1 (count s))
+          i2 (mod ind2 (count s))]
+      (apply str (concat (take (min i1 i2) s)
+                         (drop (max i1 i2) s))))
+    ""))
+
+(defn substring_del
+  [state]
+  (make-push-instruction state
+                          #(apply str (substring_del_helper %1 %2 %3))
+                          [:string :integer :integer]
+                          :string))
   
 ;; Interpreter
 
@@ -599,6 +618,32 @@
     0
     (/ (Math/abs (- (count sequence1) (count sequence2))))))
 
+(defn bond_checker [sequence1 sequence2]
+  ;;compares the number of bond characters between output and correct output
+    (let [num (reduce + (remove nil? (list*
+                    (get (frequencies sequence1) \()
+                    (get (frequencies sequence1) \))
+                    (get (frequencies sequence1) \[)
+                    (get (frequencies sequence1) \])
+                    (get (frequencies sequence1) \:)
+                    (get (frequencies sequence1) \.)
+                    (get (frequencies sequence1) \=)
+                    (get (frequencies sequence1) \-)
+                    [(get (frequencies sequence1) \#)])))
+          denom (reduce + (remove nil? (list*
+                    (get (frequencies sequence2) \()
+                    (get (frequencies sequence2) \))
+                    (get (frequencies sequence2) \[)
+                    (get (frequencies sequence2) \])
+                    (get (frequencies sequence2) \:)
+                    (get (frequencies sequence2) \.)
+                    (get (frequencies sequence2) \=)
+                    (get (frequencies sequence2) \-)
+                    [(get (frequencies sequence2) \#)])))]
+      (- 1(float (/ (min num denom) (max num denom))))
+      )
+)
+
 
 
 (defn string-classification-error-function
@@ -641,7 +686,9 @@
                         ; (+ (* 0.5 (float (- 1 (sequence-similarity output correct-output))))
                         ; (float (- 1 (sequence-similarity-jw output correct-output)))) ;;1-jw, so the higher this float value the worse the similarity
                         ; ))
-                        (+ (float (- 1 (sequence-similarity output correct-output))) (* 0.25 (float (length-matching output correct-output )))) ))
+                        ;(+ (float (- 1 (sequence-similarity-jw output correct-output))) (+ (float (- 1 (sequence-similarity output correct-output))) (* 0.25 (float (length-matching output correct-output ))))) 
+                        (+' (bond_checker output correct-output) (float (- 1 (sequence-similarity-jw output correct-output))) (float (- 1 (sequence-similarity output correct-output))) (* 0.25 (float (length-matching output correct-output ))) )
+                        ))
                     correct-outputs
                     outputs)]
     (assoc individual
@@ -655,13 +702,13 @@
   (binding [*ns* (the-ns 'propel.core)]
     (propel-gp (update-in (merge {:instructions default-instructions
                                   :error-function string-classification-error-function
-                                  :max-generations 500
+                                  :max-generations 1000
                                   :population-size 700
                                   :max-initial-plushy-size 500
                                   :step-limit 100
-                                  :parent-selection :lexicase
-                                  ; :parent-selection :tournament
-                                  ; :tournament-size 8
+                                  ; :parent-selection :lexicase
+                                  :parent-selection :tournament
+                                  :tournament-size 5
                                 }
                                  (apply hash-map
                                         (map read-string args)))
