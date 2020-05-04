@@ -38,6 +38,7 @@
    'substring_swap
    'char_get
    'char_swap
+   'char_insert
    ; 'substring_del
    ; 'close
    1
@@ -340,6 +341,25 @@
                           :string))
 
 
+(defn char_insert_helper [s ind1 ind2]
+    (if (and (not= (count s) 0) (not= (mod ind1 (count s)) (mod ind2 (count s))))
+      (let [ind1_n (min (mod ind1 (count s)) (mod ind2 (count s)))
+            ind2_n (max (mod ind1 (count s)) (mod ind2 (count s)))
+            sub1 (take (- ind1_n 1) s)
+            char1 (take 2 (drop (- ind1_n 1) s))
+            sub2 (take (- (- ind2_n ind1_n) 1) (drop (count (concat sub1 char1)) s))
+            char2 (take 1 (drop (count (concat sub1 char1 sub2)) s))
+            sub3 (drop (count (concat sub1 char1 sub2 char2)) s)]
+                (apply str (concat sub1 char2 char1 sub2 sub3))
+                )
+      "")) 
+
+(defn char_insert
+  [state]
+  (make-push-instruction state
+                          #(apply str (char_insert_helper %1 %2 %3))
+                          [:string :integer :integer]
+                          :string))
   
 ;; Interpreter
 
