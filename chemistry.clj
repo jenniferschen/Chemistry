@@ -4,17 +4,13 @@
   (:use clj-fuzzy.metrics))
 
 
-;;added [clj-fuzzy "0.4.1"] to dependencies in project.clj
-
 (def example-push-state
   {:exec '()
    :integer '(1 2 3 4 5 6 7)
    :string '("abc")
    :input {:in1 4}})
 
-; Instructions must all be either functions that take one Push state and return another
-; or constant literals.
-; TMH: ERCs?
+
 (def default-instructions
   (list
    'in1
@@ -23,13 +19,13 @@
    'integer_*
    ; 'integer_%
    ; 'integer_=
-   ; 'exec_dup
-   ; 'exec_if
-   ; 'boolean_and
-   ; 'boolean_or
-   ; 'boolean_not
-   ; 'boolean_=
-   ; 'string_=
+   'exec_dup
+   'exec_if
+   'boolean_and
+   'boolean_or
+   'boolean_not
+   'boolean_=
+   'string_=
    'string_take
    'string_drop
    'string_reverse
@@ -42,7 +38,7 @@
    'substring_swap
    'char_get
    'char_swap
-   'substring_del
+   ; 'substring_del
    ; 'close
    1
    2
@@ -53,11 +49,11 @@
    7
    8
    9
-   ; true
-   ; false
+   true
+   false
    ; "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
    ; "abcdefghijklmnopqrstuvwxyz"
-   "[]():.=-# "
+   ; "[]():.=-# "
    ; "0123456789"
    ))
 
@@ -310,8 +306,6 @@
       "")) 
 
 
-
-
 (defn char_swap
   [state]
   (make-push-instruction state
@@ -344,6 +338,8 @@
                           #(apply str (substring_del_helper %1 %2 %3))
                           [:string :integer :integer]
                           :string))
+
+
   
 ;; Interpreter
 
@@ -493,17 +489,6 @@
        :else (uniform-deletion (:plushy (select-parent pop argmap)))
        ))})
 
-; (defn new-individual
-;   "Returns a new individual produced by selection and variation of
-;   individuals in the population."
-;   [pop argmap]
-;   {:plushy
-;    (let [prob (rand)]
-;       (when (< prob 0.5) (crossover (:plushy (select-parent pop argmap))
-;                                (:plushy (select-parent pop argmap))))
-;       (when (< prob 0.7) (uniform-addition (:plushy (select-parent pop argmap))
-;                                        (:instructions argmap)))
-;       (when (< prob 0.7) (uniform-deletion (:plushy (select-parent pop argmap)))))})
 
 (defn report
   "Reports information each generation."
@@ -659,9 +644,13 @@
         ; "N c 1 c c c c ( C ( F ) ( F ) F ) c 1 "
         ; "C O c 1 c c ( N ) c c c 1 Cl "
         ; "C N N . O = c 1 c ( Cl ) c ( Cl ) c n n 1 - c 1 c c c c c 1 "
-        "Cl . N c 1 c ( Cl ) c c ( C ( F ) ( F ) F ) c c 1 Cl "
+        ; "Cl . N c 1 c ( Cl ) c c ( C ( F ) ( F ) F ) c c 1 Cl "
+        "[I-].[Na+].C=CCBr"
+        ; "c1cccc(O)c1.CCl"
         ]
         correct-outputs [
+        "[Na+].[Br-].C=CCI"
+        ; "c1ccc(O)c(C)c1.Cl"
         ; "(C(=O)OCC).(O)"
         ; "C c 1 c c 2 c ( [N+] ( = O ) [O-] ) c c c c 2 c ( Cl ) n 1"
         ; "c 1 c c c 2 c ( c 1 ) C c 1 c c c n c 1 O 2"
@@ -670,7 +659,8 @@
         ; "N C 1 C C C C ( C ( F ) ( F ) F ) C 1"
         ; "N c 1 c c c ( Cl ) c ( O ) c 1"
         ; "C N ( N ) c 1 c n n ( - c 2 c c c c c 2 ) c ( = O ) c 1 Cl"
-        "F C ( F ) ( F ) c 1 c c ( Cl ) c ( Cl ) c ( Cl ) c 1"
+        ; "F C ( F ) ( F ) c 1 c c ( Cl ) c ( Cl ) c ( Cl ) c 1"
+        ; "12843765"
         ]
         outputs (map (fn [input]
                        (peek-stack
@@ -687,7 +677,10 @@
                         ; (float (- 1 (sequence-similarity-jw output correct-output)))) ;;1-jw, so the higher this float value the worse the similarity
                         ; ))
                         ;(+ (float (- 1 (sequence-similarity-jw output correct-output))) (+ (float (- 1 (sequence-similarity output correct-output))) (* 0.25 (float (length-matching output correct-output ))))) 
-                        (+' (bond_checker output correct-output) (float (- 1 (sequence-similarity-jw output correct-output))) (float (- 1 (sequence-similarity output correct-output))) (* 0.25 (float (length-matching output correct-output ))) )
+                        (+' 
+                        ; (float (* 0.1 (- 1 (bond_checker output correct-output))))
+                         ; (float (- 1 (sequence-similarity-jw output correct-output)))
+                          (float (- 1 (sequence-similarity output correct-output))) (* 0.25 (float (length-matching output correct-output ))) )
                         ))
                     correct-outputs
                     outputs)]
@@ -702,8 +695,8 @@
   (binding [*ns* (the-ns 'propel.core)]
     (propel-gp (update-in (merge {:instructions default-instructions
                                   :error-function string-classification-error-function
-                                  :max-generations 1000
-                                  :population-size 700
+                                  :max-generations 2000
+                                  :population-size 1000
                                   :max-initial-plushy-size 500
                                   :step-limit 100
                                   ; :parent-selection :lexicase
