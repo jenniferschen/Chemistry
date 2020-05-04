@@ -39,6 +39,7 @@
    'char_get
    'char_swap
    'char_insert
+   'last_swap
    ; 'substring_del
    ; 'close
    1
@@ -312,6 +313,25 @@
   (make-push-instruction state
                           #(apply str (char_swap_helper %1 %2 %3))
                           [:string :integer :integer]
+                          :string))
+
+(defn last_swap_helper [s ind]
+  (if (not= (count s) 0)
+    (let [ind_n (mod ind (count s)) 
+          sub1 (take (- ind_n 1) s)
+          char1 (take 1 (drop (- ind_n 1) s))
+          sub2 (take (- (- (count s) ind_n) 1) (drop (count (concat sub1 char1)) s))
+          last_char (drop (- (count s) 1) s)]
+          (apply str (concat sub1 last_char sub2 char1))
+      )
+    ""))
+
+
+(defn last_swap
+  [state]
+  (make-push-instruction state
+                          #(apply str (last_swap_helper %1 %2))
+                          [:string :integer]
                           :string))
 
 (defn char_get_helper [s ind]
@@ -719,9 +739,9 @@
                                   :population-size 1000
                                   :max-initial-plushy-size 500
                                   :step-limit 100
-                                  ; :parent-selection :lexicase
-                                  :parent-selection :tournament
-                                  :tournament-size 5
+                                  :parent-selection :lexicase
+                                  ; :parent-selection :tournament
+                                  ; :tournament-size 5
                                 }
                                  (apply hash-map
                                         (map read-string args)))
