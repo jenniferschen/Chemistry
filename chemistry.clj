@@ -20,11 +20,11 @@
    ; 'integer_%
    ; 'integer_=
    'exec_dup
-   'exec_if
-   'boolean_and
-   'boolean_or
-   'boolean_not
-   'boolean_=
+   ; 'exec_if
+   ; 'boolean_and
+   ; 'boolean_or
+   ; 'boolean_not
+   ; 'boolean_=
    'string_=
    'string_take
    'string_drop
@@ -631,10 +631,10 @@
           max-dist (max (count sequence1) (count sequence2))]
       (/ (- max-dist dist) max-dist))))
 
-(defn sequence-similarity-jw
-  [sequence1 sequence2]
-  "Using jaro-winkler instead of levenshtein."
-  (jaro-winkler sequence1 sequence2))
+; (defn sequence-similarity-jw
+;   [sequence1 sequence2]
+;   "Using jaro-winkler instead of levenshtein."
+;   (jaro-winkler sequence1 sequence2))
 
 (defn length-matching
   [sequence1 sequence2]
@@ -684,12 +684,13 @@
         ; "N c 1 c c c c ( C ( F ) ( F ) F ) c 1 "
         ; "C O c 1 c c ( N ) c c c 1 Cl "
         ; "C N N . O = c 1 c ( Cl ) c ( Cl ) c n n 1 - c 1 c c c c c 1 "
-        ; "Cl . N c 1 c ( Cl ) c c ( C ( F ) ( F ) F ) c c 1 Cl "
-        "[I-].[Na+].C=CCBr"
+        "Cl . N c 1 c ( Cl ) c c ( C ( F ) ( F ) F ) c c 1 Cl "
+        ; "[I-].[Na+].C=CCBr"
         ; "c1cccc(O)c1.CCl"
+        
         ]
         correct-outputs [
-        "[Na+].[Br-].C=CCI"
+        ; "[Na+].[Br-].C=CCI"
         ; "c1ccc(O)c(C)c1.Cl"
         ; "(C(=O)OCC).(O)"
         ; "C c 1 c c 2 c ( [N+] ( = O ) [O-] ) c c c c 2 c ( Cl ) n 1"
@@ -699,7 +700,7 @@
         ; "N C 1 C C C C ( C ( F ) ( F ) F ) C 1"
         ; "N c 1 c c c ( Cl ) c ( O ) c 1"
         ; "C N ( N ) c 1 c n n ( - c 2 c c c c c 2 ) c ( = O ) c 1 Cl"
-        ; "F C ( F ) ( F ) c 1 c c ( Cl ) c ( Cl ) c ( Cl ) c 1"
+        "F C ( F ) ( F ) c 1 c c ( Cl ) c ( Cl ) c ( Cl ) c 1"
         ; "12843765"
         ]
         outputs (map (fn [input]
@@ -736,12 +737,12 @@
     (propel-gp (update-in (merge {:instructions default-instructions
                                   :error-function string-classification-error-function
                                   :max-generations 2000
-                                  :population-size 1000
+                                  :population-size 800
                                   :max-initial-plushy-size 500
                                   :step-limit 100
-                                  :parent-selection :lexicase
-                                  ; :parent-selection :tournament
-                                  ; :tournament-size 5
+                                  ; :parent-selection :lexicase
+                                  :parent-selection :tournament
+                                  :tournament-size 5
                                 }
                                  (apply hash-map
                                         (map read-string args)))
