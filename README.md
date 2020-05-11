@@ -1,10 +1,10 @@
 # CHEMISTRY TIME
 
-tryna predict reactions!!
+Predicting reactions through evolving SMILES string manipulation programs.
 
 ## Installation
 
-download command-line clojure! First install Homebrew and then run 
+Download command-line clojure. First install Homebrew, then run
 
 ```bash
 brew install clojure
@@ -12,13 +12,9 @@ brew install clojure
 
 ### Usage
 
-Run IntelliJ and add [clj-fuzzy "0.4.1"] to dependencies in project.clj
+Run IntelliJ to run the program on the REPL using this command:
 
 ```bash
 (-main)
 ```
-
-### anotha one
-
-asdf
 
