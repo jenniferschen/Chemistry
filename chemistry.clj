@@ -1,17 +1,11 @@
 ;;propel
 (ns propel.core
-  (:gen-class)
-  (:use clj-fuzzy.metrics))
-
-
-(def example-push-state
-  {:exec '()
-   :integer '(1 2 3 4 5 6 7)
-   :string '("abc")
-   :input {:in1 4}})
+  (:gen-class))
 
 
 (def default-instructions
+  "Default instructions for the program to evolve. Some are commented out that
+  may be of use as the project progresses."
   (list
    'in1
    'integer_+
@@ -36,11 +30,12 @@
    'string_replacefirst
    'string_swap
    'substring_swap
-   'char_get
+   'char_get_cap
    'char_swap
    'char_insert
    'last_swap
-   ; 'substring_del
+   'newchar_insert
+   'substring_del
    ; 'close
    1
    2
@@ -266,6 +261,7 @@
   ))
 
 (defn string_swap
+  "Flips entire string at specified index."
   [state]
   (make-push-instruction state
                           #(apply str (string_swap_helper %1 %2))
@@ -288,6 +284,7 @@
 
 
 (defn substring_swap
+  "Flips substring specified by 2 indices at its halfway point." 
   [state]
   (make-push-instruction state
                           #(apply str (substring_swap_helper %1 %2 %3))
@@ -309,6 +306,7 @@
 
 
 (defn char_swap
+  "Swaps two characters within the string."
   [state]
   (make-push-instruction state
                           #(apply str (char_swap_helper %1 %2 %3))
@@ -328,20 +326,22 @@
 
 
 (defn last_swap
+  "Swaps the last character of the string with a character at a specified index."
   [state]
   (make-push-instruction state
                           #(apply str (last_swap_helper %1 %2))
                           [:string :integer]
                           :string))
 
-(defn char_get_helper [s ind]
-  (take 1 (drop (mod ind (+ 1 (count s))) s))
+(defn char_get_cap_helper [s ind]
+  (clojure.string/capitalize (apply str (take 1 (drop (mod ind (+ 1 (count s))) s))))
   )
 
-(defn char_get
+(defn char_get_cap
+  "Returns a character from the string but capitalized if not already."
   [state]
   (make-push-instruction state
-                          #(apply str (char_get_helper %1 %2))
+                          #(apply str (char_get_cap_helper %1 %2))
                           [:string :integer]
                           :string))
 
@@ -354,6 +354,7 @@
     ""))
 
 (defn substring_del
+  "Returns the string with a substring removed from it, as specified by indices."
   [state]
   (make-push-instruction state
                           #(apply str (substring_del_helper %1 %2 %3))
@@ -375,10 +376,29 @@
       "")) 
 
 (defn char_insert
+  "Takes character at index 2 and inserts it before index 1."
   [state]
   (make-push-instruction state
                           #(apply str (char_insert_helper %1 %2 %3))
                           [:string :integer :integer]
+                          :string))
+
+
+(defn newchar_insert_helper [s ind1 newchar]
+    (if (not= (count s) 0)
+      (let [ind1_n (+ 1(mod ind1 (count s)))
+            sub1 (take (- ind1_n 1) s)
+            sub2 (drop (count sub1) s)]
+                (apply str (concat sub1 newchar sub2))
+                )
+      "")) 
+
+(defn newchar_insert
+"Inserts specified character into the given string at a given index."
+  [state]
+  (make-push-instruction state
+                          #(apply str (newchar_insert_helper %1 %2 %3))
+                          [:string :integer :string]
                           :string))
   
 ;; Interpreter
@@ -631,21 +651,17 @@
           max-dist (max (count sequence1) (count sequence2))]
       (/ (- max-dist dist) max-dist))))
 
-; (defn sequence-similarity-jw
-;   [sequence1 sequence2]
-;   "Using jaro-winkler instead of levenshtein."
-;   (jaro-winkler sequence1 sequence2))
 
 (defn length-matching
   [sequence1 sequence2]
-  "comparing lengths of output and correct output."
+  "Compares lengths of output and correct output."
   (if (zero? (- (count sequence1) (count sequence2)))
     0
     (/ (Math/abs (- (count sequence1) (count sequence2))))))
 
 (defn bond_checker [sequence1 sequence2]
-  ;;compares the number of bond characters between output and correct output
-    (let [num (reduce + (remove nil? (list*
+  "Compares the number of bond characters between output and correct output"
+    (let [numerator (reduce + (remove nil? (list*
                     (get (frequencies sequence1) \()
                     (get (frequencies sequence1) \))
                     (get (frequencies sequence1) \[)
@@ -654,7 +670,7 @@
                     (get (frequencies sequence1) \.)
                     (get (frequencies sequence1) \=)
                     (get (frequencies sequence1) \-)
-                    [(get (frequencies sequence1) \#)])))
+                    (get (frequencies sequence1) \#))))
           denom (reduce + (remove nil? (list*
                     (get (frequencies sequence2) \()
                     (get (frequencies sequence2) \))
@@ -664,11 +680,27 @@
                     (get (frequencies sequence2) \.)
                     (get (frequencies sequence2) \=)
                     (get (frequencies sequence2) \-)
-                    [(get (frequencies sequence2) \#)])))]
-      (- 1(float (/ (min num denom) (max num denom))))
+                    (get (frequencies sequence2) \#))))]
+      (if (or (= numerator 0) (= denom 0))
+      0
+      (float (/ (min numerator denom) (max numerator denom)))
+      )
       )
 )
 
+
+(defn space-split [s] 
+  (clojure.string/split s #"\s"))
+  
+(defn remove-space [s]
+ (clojure.string/join "" (remove clojure.string/blank? (space-split s)))
+ )
+
+(defn char-checker [sequence1 sequence2]
+  "Compares the number of all characters with whitespaces remvoed between output and correct output"
+    (- 1 (/ (min (count (remove-space sequence1)) (count (remove-space sequence2)))
+    (max (count (remove-space sequence1)) (count (remove-space sequence2)))))
+)
 
 
 (defn string-classification-error-function
@@ -677,31 +709,19 @@
   (let [program (push-from-plushy (:plushy individual))
         inputs [
         ; "(C(=O)O).(OCC)"
-        ; "C c 1 c c 2 c ( [N+] ( = O ) [O-] ) c c c c 2 c [n+] 1 [O-] . O = P ( Cl ) ( Cl ) Cl"
-        ; "O C 1 c 2 c c c c c 2 O c 2 n c c c c 2 1"
-        ; "O = c 1 c 2 c c ( C = N O ) c c c 2 o c 2 n c c c c 1 2"
-        ; "O = C ( [O-] ) c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1 . O = S ( Cl ) Cl"
-        ; "N c 1 c c c c ( C ( F ) ( F ) F ) c 1 "
-        ; "C O c 1 c c ( N ) c c c 1 Cl "
-        ; "C N N . O = c 1 c ( Cl ) c ( Cl ) c n n 1 - c 1 c c c c c 1 "
-        "Cl . N c 1 c ( Cl ) c c ( C ( F ) ( F ) F ) c c 1 Cl "
         ; "[I-].[Na+].C=CCBr"
-        ; "c1cccc(O)c1.CCl"
-        
+        ; "Br Br . C O c 1 c c c ( Cl ) c n 1 "
+        ; "C O . O c 1 c c c c c 1 Br . [OH-] "
+        ; "N N . O = C 1 N S ( = O ) ( = O ) c 2 c c c c c 2 1"
+        "N N . O = C 1 N S ( = O ) ( = O ) c 2 c c ( Cl ) c ( Cl ) c c 2 1"
         ]
         correct-outputs [
-        ; "[Na+].[Br-].C=CCI"
-        ; "c1ccc(O)c(C)c1.Cl"
         ; "(C(=O)OCC).(O)"
-        ; "C c 1 c c 2 c ( [N+] ( = O ) [O-] ) c c c c 2 c ( Cl ) n 1"
-        ; "c 1 c c c 2 c ( c 1 ) C c 1 c c c n c 1 O 2"
-        ; "N # C c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1"
-        ; "O = C ( Cl ) c 1 c c c 2 o c 3 n c c c c 3 c ( = O ) c 2 c 1"
-        ; "N C 1 C C C C ( C ( F ) ( F ) F ) C 1"
-        ; "N c 1 c c c ( Cl ) c ( O ) c 1"
-        ; "C N ( N ) c 1 c n n ( - c 2 c c c c c 2 ) c ( = O ) c 1 Cl"
-        "F C ( F ) ( F ) c 1 c c ( Cl ) c ( Cl ) c ( Cl ) c 1"
-        ; "12843765"
+        ; "[Na+].[Br-].C=CCI"
+        ; "C O c 1 n c c ( Cl ) c c 1 Br"
+        ; "C O c 1 c c c c c 1 O"
+        ; "N N C 1 N S ( = O ) ( = O ) c 2 c c c c c 2 1"
+        "N N C 1 = N S ( = O ) ( = O ) c 2 c c ( Cl ) c ( Cl ) c c 2 1"
         ]
         outputs (map (fn [input]
                        (peek-stack
@@ -714,13 +734,9 @@
         errors (map (fn [correct-output output]
                       (if (= output :no-stack-item)
                         1000000
-                        ; (+ (* 0.5 (float (- 1 (sequence-similarity output correct-output))))
-                        ; (float (- 1 (sequence-similarity-jw output correct-output)))) ;;1-jw, so the higher this float value the worse the similarity
-                        ; ))
-                        ;(+ (float (- 1 (sequence-similarity-jw output correct-output))) (+ (float (- 1 (sequence-similarity output correct-output))) (* 0.25 (float (length-matching output correct-output ))))) 
                         (+' 
-                        ; (float (* 0.1 (- 1 (bond_checker output correct-output))))
-                         ; (float (- 1 (sequence-similarity-jw output correct-output)))
+                        (float (* 0.1 (char-checker output correct-output)))
+                         (float (* 0.1 (- 1 (bond_checker output correct-output))))
                           (float (- 1 (sequence-similarity output correct-output))) (* 0.25 (float (length-matching output correct-output ))) )
                         ))
                     correct-outputs
@@ -740,12 +756,14 @@
                                   :population-size 800
                                   :max-initial-plushy-size 500
                                   :step-limit 100
-                                  ; :parent-selection :lexicase
-                                  :parent-selection :tournament
-                                  :tournament-size 5
+                                  :parent-selection :lexicase
+                                  ; :parent-selection :tournament
+                                  ; :tournament-size 5
                                 }
                                  (apply hash-map
                                         (map read-string args)))
                           [:error-function]
                           #(if (fn? %) % (eval %))))))
+
+(-main)
 
