@@ -12,9 +12,9 @@ brew install clojure
 
 ### Usage
 
-Run IntelliJ to run the program on the REPL using this command:
+Run using the following command:
 
 ```bash
-(-main)
+clojure chemistry.clj
 ```
 
